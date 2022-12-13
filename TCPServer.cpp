@@ -4,6 +4,22 @@
 
 #include "TCPServer.h"
 
+namespace {
+    /**
+     * Parse line to find the path, which is the second token as delimited by " " in HTTP requests
+    */
+    char * find_path(char * line, const char * delim) {
+        char * token = strtok(line, delim);
+
+        if (token != NULL) {
+            token = strtok(NULL, delim);
+        }
+
+        printf("PATH: %s\n", token);
+        return token;
+    }
+}
+
 namespace http {
     TCPServer::TCPServer(std::string ip_address, int port) {
         this->port = port;
@@ -90,6 +106,7 @@ namespace http {
         int bytes_read = read(new_socket, buffer, sizeof(buffer));
 
         printf("%s", buffer);
+        find_path(buffer, " ");
     }
 
     /**
