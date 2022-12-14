@@ -150,11 +150,26 @@ namespace http {
             exit(1);
         }
 
-        // handle the new socket connection
-        handleConnection();
+        int pid = fork();
 
-        // done with new socket, close it
-        close (new_socket);
+        if (pid < 0) {
+            perror("Forking error");
+            exit(1);
+        }
+
+        if (pid == 0) { // Child process
+            // handle the new socket connection
+            handleConnection();
+
+            // done with new socket, close it
+            close (new_socket);
+
+            // child process completed job, exit child process
+            exit(0);
+        } else { // Parent process
+            // done with this socket descriptor from client, close it and move onto next accept.
+            close(new_socket);
+        }
     }
 
     /**
