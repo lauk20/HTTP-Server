@@ -1,6 +1,10 @@
 #include <iostream>
 #include <sstream>
 #include <unistd.h>
+#include <sys/sendfile.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 #include "TCPServer.h"
 
@@ -15,7 +19,6 @@ namespace {
             token = strtok(NULL, delim);
         }
 
-        printf("PATH: %s\n", token);
         return token;
     }
 }
@@ -73,6 +76,7 @@ namespace http {
         }
 
         while (1) {
+            printf("Accepting Connections...\n");
             acceptConnection();
         }
     }
@@ -105,8 +109,65 @@ namespace http {
         char buffer[16000] = {0};
         int bytes_read = read(new_socket, buffer, sizeof(buffer));
 
-        printf("%s", buffer);
-        find_path(buffer, " ");
+        printf("%s\n", buffer);
+        char * path = find_path(buffer, " ");
+        char * localpath = (char *)calloc(500, sizeof(char));
+        char * http_header = (char *)calloc(100, sizeof(char));
+        strcat(localpath, ".");
+        strcat(http_header, "HTTP/1.1 200 OK\r\n");
+
+        if (strcmp(path, "/") == 0) {
+            strcat(localpath, "/index.html");
+            strcat(http_header, "Content-Type: text/html\r\n");
+        }
+
+        respond(localpath, http_header);
+        free(localpath);
+        free(http_header);
+    }
+
+    /**
+     * Respond with the requested file if found.
+     *
+     * @param localpath Relative path of the file requested
+     * @param http_header HTTP Header to respond with
+    */
+    void TCPServer::respond(char * localpath, char * http_header) {
+        int file = open(localpath, O_RDONLY);
+
+        // Could not open file or path is "." then return
+        if (file < 0 || strcmp(localpath, ".") == 0) {
+            //printf("FILE: %s\n", localpath);
+            strcpy(http_header, "HTTP/1.1 404 Not Found\r\n");
+            write(new_socket, http_header, strlen(http_header));
+            return;
+        }
+
+        // Get file info
+        struct stat file_info;
+        fstat(file, &file_info);
+        int size = file_info.st_size;
+        int block_size = file_info.st_blksize;
+        char char_size[10];
+        sprintf(char_size, "%d", size);
+
+        // Add Content-Length to HTTP Header
+        strcat(http_header, "Content-Length: ");
+        strcat(http_header, char_size);
+        // End Header, Starting HTTP Body
+        strcat(http_header, "\r\n\r\n");
+        
+        // Write HTTP Header to client socket
+        write(new_socket, http_header, strlen(http_header));
+
+        // Write the requested file to client socket
+        while (size > 0) {
+            int sent_bytes = sendfile(new_socket, file, NULL, block_size);
+            size = size - sent_bytes;
+        }
+
+        // Close the opened file
+        close(file);
     }
 
     /**

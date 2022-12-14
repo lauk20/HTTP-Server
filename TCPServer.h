@@ -34,6 +34,7 @@ namespace http {
             void closeServer();
             void acceptConnection();
             void handleConnection();
+            void respond(char *, char *);
     };
 }
 
