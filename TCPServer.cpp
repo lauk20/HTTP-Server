@@ -14,7 +14,7 @@
 namespace {
     /**
      * Parse line to find the path, which is the second token as delimited by " " in HTTP requests
-    */
+     */
     char * find_path(char * line, const char * delim) {
         char * token = strtok(line, delim);
 
@@ -25,6 +25,9 @@ namespace {
         return token;
     }
 
+    /**
+     * Split the string into a list, as delimited by delim.
+     */
     std::vector<std::string> split(std::string s, std::string delim) {
         size_t start = 0, end;
         std::string token;
@@ -40,9 +43,31 @@ namespace {
 
         return result;
     }
+    
+    /**
+     * Determines whether we are staying in our allowed directory.
+     * @param path The path we are given.
+     */
+    bool validate_directory(std::string path) {
+        std::vector<std::string> dir_levels = split(path, "/");
+        int level = -1; // let 0 = our current level "./"
+
+        for (std::string s : dir_levels) {
+            if (s == "..") {
+                level = level - 1;
+            } else {
+                level = level + 1;
+            }
+        }
+
+        return level > 0;
+    }
 }
 
 namespace http {
+    /**
+     * Content-Type header format
+     */
     static std::unordered_map<std::string, std::string> content_type = {
         {"html", "text/html"},
         {"css", "text/css"},
@@ -52,6 +77,7 @@ namespace http {
         {"gif", "image/gif"},
         {"jpeg", "image/jpeg"},
         {"png", "image/png"},
+        {"svg", "image/svg+xml"}
     };
 
     TCPServer::TCPServer(std::string ip_address, int port) {
@@ -65,7 +91,7 @@ namespace http {
 
     /**
      * Create the socket and bind it to the given port.
-    */
+     */
     int TCPServer::startServer() {
         // create socket
         socket_descriptor = socket(AF_INET, SOCK_STREAM, 0);
@@ -133,7 +159,7 @@ namespace http {
 
     /**
      * Handles the connection. Reads any data and responds as needed.
-    */
+     */
     void TCPServer::handleConnection() {
         // read what the client socket has sent
         char buffer[16000] = {0};
@@ -141,8 +167,19 @@ namespace http {
 
         printf("%s\n", buffer);
         std::string path = find_path(buffer, " ");
-        std::string localpath = ".";
+        std::string localpath = "./src"; // Entry Directory is ./src
         std::string http_header = "HTTP/1.1 200 OK\r\n";
+
+        // Path leads outside of ./src, security risk. Respond with 404 and return.
+        // This does not seem to be a problem as tested through using Microsoft Edge since it seems
+        // to clean the directory before sending a HTTP-GET request but just in case.
+        if (!validate_directory(localpath + path)) {
+            printf("Client tried to access file outside of allowed directory: %s\n", (localpath + path).c_str());
+            http_header = "HTTP/1.1 404 Not Found\r\n";
+            write(new_socket, http_header.c_str(), http_header.size());
+
+            return;
+        }
 
         if (path == "/") {
             localpath = localpath + "/index.html";
@@ -167,7 +204,7 @@ namespace http {
      *
      * @param localpath Relative path of the file requested
      * @param http_header HTTP Header to respond with
-    */
+     */
     void TCPServer::respond(std::string localpath, std::string http_header) {
         int file = open(localpath.c_str(), O_RDONLY);
 
@@ -209,7 +246,7 @@ namespace http {
 
     /**
      * Closes the server and client sockets and exits.
-    */
+     */
     void TCPServer::closeServer() {
         close(socket_descriptor);
         close(new_socket);
