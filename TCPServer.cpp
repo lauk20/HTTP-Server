@@ -110,20 +110,16 @@ namespace http {
         int bytes_read = read(new_socket, buffer, sizeof(buffer));
 
         printf("%s\n", buffer);
-        char * path = find_path(buffer, " ");
-        char * localpath = (char *)calloc(500, sizeof(char));
-        char * http_header = (char *)calloc(100, sizeof(char));
-        strcat(localpath, ".");
-        strcat(http_header, "HTTP/1.1 200 OK\r\n");
+        std::string path = find_path(buffer, " ");
+        std::string localpath = ".";
+        std::string http_header = "HTTP/1.1 200 OK\r\n";
 
-        if (strcmp(path, "/") == 0) {
-            strcat(localpath, "/index.html");
-            strcat(http_header, "Content-Type: text/html\r\n");
+        if (path == "/") {
+            localpath = localpath + "/index.html";
+            http_header = http_header + "Content-Type: text/html\r\n";
         }
 
         respond(localpath, http_header);
-        free(localpath);
-        free(http_header);
     }
 
     /**
@@ -132,14 +128,14 @@ namespace http {
      * @param localpath Relative path of the file requested
      * @param http_header HTTP Header to respond with
     */
-    void TCPServer::respond(char * localpath, char * http_header) {
-        int file = open(localpath, O_RDONLY);
+    void TCPServer::respond(std::string localpath, std::string http_header) {
+        int file = open(localpath.c_str(), O_RDONLY);
 
         // Could not open file or path is "." then return
-        if (file < 0 || strcmp(localpath, ".") == 0) {
+        if (file < 0 || localpath == ".") {
             //printf("FILE: %s\n", localpath);
-            strcpy(http_header, "HTTP/1.1 404 Not Found\r\n");
-            write(new_socket, http_header, strlen(http_header));
+            http_header = "HTTP/1.1 404 Not Found\r\n";
+            write(new_socket, http_header.c_str(), http_header.size());
             return;
         }
 
@@ -152,13 +148,14 @@ namespace http {
         sprintf(char_size, "%d", size);
 
         // Add Content-Length to HTTP Header
-        strcat(http_header, "Content-Length: ");
-        strcat(http_header, char_size);
+        http_header = http_header + "Content-Length: ";
+        http_header = http_header + char_size;
+
         // End Header, Starting HTTP Body
-        strcat(http_header, "\r\n\r\n");
+        http_header = http_header + "\r\n\r\n";
         
         // Write HTTP Header to client socket
-        write(new_socket, http_header, strlen(http_header));
+        write(new_socket, http_header.c_str(), http_header.size());
 
         // Write the requested file to client socket
         while (size > 0) {

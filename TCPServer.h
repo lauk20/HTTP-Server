@@ -34,7 +34,7 @@ namespace http {
             void closeServer();
             void acceptConnection();
             void handleConnection();
-            void respond(char *, char *);
+            void respond(std::string, std::string);
     };
 }
 
