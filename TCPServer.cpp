@@ -1,10 +1,13 @@
 #include <iostream>
 #include <sstream>
+#include <vector>
 #include <unistd.h>
 #include <sys/sendfile.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <netinet/in.h>
+#include <netdb.h>
 
 #include "TCPServer.h"
 
@@ -21,9 +24,36 @@ namespace {
 
         return token;
     }
+
+    std::vector<std::string> split(std::string s, std::string delim) {
+        size_t start = 0, end;
+        std::string token;
+        std::vector<std::string> result;
+
+        while ((end = s.find(delim, start)) != std::string::npos) {
+            token = s.substr(start, end - start);
+            start = end + delim.size();
+            result.push_back(token);
+        }
+
+        result.push_back(s.substr(start));
+
+        return result;
+    }
 }
 
 namespace http {
+    static std::unordered_map<std::string, std::string> content_type = {
+        {"html", "text/html"},
+        {"css", "text/css"},
+        {"csv", "text/csv"},
+        {"xml", "text/xml"},
+        {"js", "application/javascript"},
+        {"gif", "image/gif"},
+        {"jpeg", "image/jpeg"},
+        {"png", "image/png"},
+    };
+
     TCPServer::TCPServer(std::string ip_address, int port) {
         this->port = port;
         startServer();
@@ -117,6 +147,16 @@ namespace http {
         if (path == "/") {
             localpath = localpath + "/index.html";
             http_header = http_header + "Content-Type: text/html\r\n";
+        } else {
+            std::vector<std::string> args = split(path, ".");
+            std::string file_extension = args.back();
+            localpath = localpath + path;
+
+            if (content_type.find(file_extension) != content_type.end()) {
+                http_header = http_header + "Content-Type: " + content_type.at(file_extension) + "\r\n";
+            } else {
+                http_header = http_header + "Content-Type: text/plain\r\n";
+            }
         }
 
         respond(localpath, http_header);

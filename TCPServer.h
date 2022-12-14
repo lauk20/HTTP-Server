@@ -3,6 +3,7 @@
 #include <arpa/inet.h>
 #include <stdlib.h>
 #include <cstring>
+#include <unordered_map>
 
 #ifndef TCPSERVER_H
 #define TCPSERVER_H
